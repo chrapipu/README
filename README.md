@@ -73,9 +73,189 @@
 
 ### Схема данных
 
-Описание отношений и структур данных, используемых в ПС. Также представить скрипт (программный код), который необходим для генерации БД
+Пользователи и роли. Таблица users – зарегистрированные пользователи системы. Хранит базовую информацию о менеджерах и директорах. Атрибуты:
+– id (PK) – уникальный идентификатор пользователя
+– username – имя или логин;
+– email –  электронная почта (уникальная);
+– password_hash –  хэш пароля.
+Таблица user_roles – модель ролевого доступа.
+Позволяет управлять правами пользователей.
+Атрибуты:
+– user_id (PK, FK → users.id) –  идентификатор пользователя;
+– role – роль в системе (ROLE_MANAGER, ROLE_DIRECTOR).
+Продажи и товары. Таблица categories хранит справочник товарных категорий. Атрибуты: 
+– id (PK) – уникальный идентификатор категории; 
+– name – наименование категории.
+Таблица products содержит информацию о товарах. Атрибуты: 
+– id (PK) – уникальный идентификатор товара;
+– name – наименование товара; 
+– category_id (FK → categories.id) – категория товара;
+– supplier_name – поставщик;
+– price – цена;
+– promo_flag – участвует ли товар в акции (true, false); 
+– unit – единица измерения (шт, кг, л).
+Таблица sales фиксирует факты продаж. Атрибуты: 
+– id (PK) – уникальный идентификатор продажи; 
+– product_id (FK → products.id) – проданный товар;
+– quantity – количество; 
+ – total_amount – сумма;
+– sale_date – дата продажи.
+Аналитика. Таблица product_metrics – показатели по товарам. Фиксирует ключевые метрики по каждому товару за период. Атрибуты:
+– product_id (FK → products.id) – товар;
+– period – период агрегации (2025‑10, 2025‑Q3, 2025‑W40);
+– total_sales (FK → sales. total_amount) – сумма продаж;
+– units_sold (FK → sales. quantity) – количество проданных единиц;
+– avg_unit_price (FK → sales.AVG(total_amount / quantity))  – средняя цена за единицу;
+– promo_share (FK → products.promo_flag)  – доля продаж по акции (в процентах).
+Таблица sales_summary – сводные показатели по продажам. Фиксирует ключевые метрики по всем продажам за период, независимо от конкретного товара. Атрибуты: 
+– period – период агрегации (например, 2025 10, 2025 Q3, 2025 W40); 
+– total_revenue (FK → sales.total_amount) – общая сумма продаж за период;
+ – total_units_sold (FK → sales.quantity) – общее количество проданных единиц; 
+– average_check (FK → sales.AVG(total_amount)) – средний чек; 
+– top_category (FK → products.category) – категория с наибольшей выручкой; 
+Таблица category_metrics – показатели по товарным категориям. Агрегирует ключевые метрики по каждой категории товаров за период. Атрибуты: 
+– category (FK → category.id) – наименование категории; 
+– period – период агрегации (например, 2025 10, 2025 Q3, 2025 W40); 
+– units_sold (FK → sales.quantity) – общее количество проданных единиц в категории; 
+– total_sales (FK → sales.total_amount) – суммарная выручка по категории; 
+– avg_unit_price (FK → sales.AVG(total_amount / quantity)) – средняя цена за единицу;
+– promo_share (FK → products.promo_flag) – доля акционных продаж в категории (в процентах); 
+– top_product (FK → products.id) – самый продаваемый товар в категории (по выручке);
+Таблица check_dynamics – динамика среднего чека. Позволяет отслеживать, как меняется средний чек по дням, неделям или месяцам. Атрибуты: 
+– period – период агрегации (2025 10 08, 2025 W40, 2025 10);
+– average_check (FK → sales.AVG(total_amount)) – средний чек за период;
+– min_check (FK → sales.MIN(total_amount)) – минимальный чек;
+– max_check (FK → sales.MAX(total_amount)) – максимальный чек;
+– promo_check – средний чек по акционным товарам (WHERE pro-mo_flag = true); 
+– non_promo_check – средний чек по обычным товарам (WHERE pro-mo_flag = false).
+Таблица revenue_metrics – детализация выручки. Фиксирует структуру выручки по товарам и категориям за период, с возможностью анализа акций. Атрибуты: 
+– period – период агрегации (2025 10, 2025 Q3, 2025 W40);
+– product_id (FK → products.id) – товар;
+– category (FK → category.id) – категория товара;
+– total_revenue (FK → sales.total_amount) – суммарная выручка по товару;
+– promo_revenue – выручка от акционных продаж (WHERE promo_flag = true);
+– non_promo_revenue – выручка от обычных продаж (WHERE pro-mo_flag = false); 
+– revenue_share – доля товара в общей выручке за период (в процентах).
 
----
+<img width="926" height="572" alt="image" src="https://github.com/user-attachments/assets/d5628c3a-51b7-440d-8180-c9fb4ab93340" />
+
+Рисунок 1 – Схема базы данных
+
+Обоснование приведения к 3НФ. 
+Первая нормальная форма (1НФ):
+Все атрибуты атомарные (например, username, email, price, sale_date не содержат составных или повторяющихся значений).
+Нет повторяющихся групп – каждая таблица фиксирует только один тип сущности: пользователи, роли, категории, товары, продажи.
+Вторая нормальная форма (2НФ):
+Все неключевые атрибуты зависят от полного первичного ключа. 
+– В users атрибуты username, email, password_hash зависят только от id. 
+– В products атрибуты name, category_id, supplier_name, price, pro-mo_flag, unit зависят только от id. 
+– В sales атрибуты product_id, quantity, total_amount, sale_date зависят только от id.
+В аналитических таблицах (product_metrics, sales_summary, catego-ry_metrics, check_dynamics, revenue_metrics) все показатели зависят от составного ключа (period + ссылка на товар/категорию).
+Третья нормальная форма (3НФ):
+Нет транзитивных зависимостей: 
+– Данные о пользователях хранятся только в users, а не дублируются в user_roles или аналитике. 
+– Данные о категориях хранятся только в categories, а не дублируются в products. 
+– Данные о товарах хранятся только в products, а не дублируются в sales или аналитике. 
+– В аналитических таблицах (*_metrics, sales_summary, check_dynamics) хранятся только агрегированные показатели, а не справочные данные о товарах или пользователях.
+Таким образом, схема приведена к 3НФ, что обеспечивает:
+– отсутствие избыточности (нет дублирования категорий, товаров, пользователей); 
+– целостность данных (все связи через внешние ключи, справочники вынесены отдельно); 
+– удобство расширения и поддержки (можно добавлять новые категории, товары, метрики без изменения структуры других таблиц).
+
+Скрипт генерации БД:
+-- === Пользователи и роли ===
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL
+);
+
+CREATE TABLE user_roles (
+    user_id INT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(50) NOT NULL CHECK (role IN ('ROLE_MANAGER', 'ROLE_DIRECTOR'))
+);
+
+-- === Категории и товары ===
+CREATE TABLE categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(150) NOT NULL UNIQUE
+);
+
+CREATE TABLE products (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    category_id INT NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
+    supplier_name VARCHAR(200),
+    price NUMERIC(12,2) NOT NULL,
+    promo_flag BOOLEAN DEFAULT FALSE,
+    unit VARCHAR(20) NOT NULL
+);
+
+-- === Продажи ===
+CREATE TABLE sales (
+    id SERIAL PRIMARY KEY,
+    product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    quantity NUMERIC(12,3) NOT NULL,
+    total_amount NUMERIC(14,2) NOT NULL,
+    sale_date DATE NOT NULL
+);
+
+-- === Аналитика ===
+-- Метрики по товарам
+CREATE TABLE product_metrics (
+    product_id INT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    period VARCHAR(20) NOT NULL,
+    total_sales NUMERIC(14,2),
+    units_sold NUMERIC(12,3),
+    avg_unit_price NUMERIC(12,2),
+    promo_share NUMERIC(5,2),
+    PRIMARY KEY (product_id, period)
+);
+
+-- Сводные продажи
+CREATE TABLE sales_summary (
+    period VARCHAR(20) PRIMARY KEY,
+    total_revenue NUMERIC(14,2),
+    total_units_sold NUMERIC(14,3),
+    average_check NUMERIC(12,2),
+    top_category INT REFERENCES categories(id)
+);
+
+-- Метрики по категориям
+CREATE TABLE category_metrics (
+    category_id INT NOT NULL REFERENCES categories(id),
+    period VARCHAR(20) NOT NULL,
+    units_sold NUMERIC(14,3),
+    total_sales NUMERIC(14,2),
+    avg_unit_price NUMERIC(12,2),
+    promo_share NUMERIC(5,2),
+    top_product INT REFERENCES products(id),
+    PRIMARY KEY (category_id, period)
+);
+
+-- Динамика среднего чека
+CREATE TABLE check_dynamics (
+    period VARCHAR(20) PRIMARY KEY,
+    average_check NUMERIC(12,2),
+    min_check NUMERIC(12,2),
+    max_check NUMERIC(12,2),
+    promo_check NUMERIC(12,2),
+    non_promo_check NUMERIC(12,2)
+);
+
+-- Аналитика выручки
+CREATE TABLE revenue_metrics (
+    period VARCHAR(20) NOT NULL,
+    product_id INT NOT NULL REFERENCES products(id),
+    category_id INT NOT NULL REFERENCES categories(id),
+    total_revenue NUMERIC(14,2),
+    promo_revenue NUMERIC(14,2),
+    non_promo_revenue NUMERIC(14,2),
+    revenue_share NUMERIC(5,2),
+    PRIMARY KEY (period, product_id, category_id)
+);
+
 
 ## **Функциональные возможности**
 
