@@ -74,67 +74,129 @@
 ### Схема данных
 
 Пользователи и роли. Таблица users – зарегистрированные пользователи системы. Хранит базовую информацию о менеджерах и директорах. Атрибуты:
+
 – id (PK) – уникальный идентификатор пользователя
+
 – username – имя или логин;
+
 – email –  электронная почта (уникальная);
+
 – password_hash –  хэш пароля.
+
 Таблица user_roles – модель ролевого доступа.
+
 Позволяет управлять правами пользователей.
+
 Атрибуты:
+
 – user_id (PK, FK → users.id) –  идентификатор пользователя;
+
 – role – роль в системе (ROLE_MANAGER, ROLE_DIRECTOR).
+
 Продажи и товары. Таблица categories хранит справочник товарных категорий. Атрибуты: 
+
 – id (PK) – уникальный идентификатор категории; 
+
 – name – наименование категории.
+
 Таблица products содержит информацию о товарах. Атрибуты: 
+
 – id (PK) – уникальный идентификатор товара;
+
 – name – наименование товара; 
+
 – category_id (FK → categories.id) – категория товара;
+
 – supplier_name – поставщик;
+
 – price – цена;
+
 – promo_flag – участвует ли товар в акции (true, false); 
+
 – unit – единица измерения (шт, кг, л).
+
 Таблица sales фиксирует факты продаж. Атрибуты: 
+
 – id (PK) – уникальный идентификатор продажи; 
+
 – product_id (FK → products.id) – проданный товар;
+
 – quantity – количество; 
+
  – total_amount – сумма;
-– sale_date – дата продажи.
+–
+sale_date – дата продажи.
+
 Аналитика. Таблица product_metrics – показатели по товарам. Фиксирует ключевые метрики по каждому товару за период. Атрибуты:
+
 – product_id (FK → products.id) – товар;
+
 – period – период агрегации (2025‑10, 2025‑Q3, 2025‑W40);
+
 – total_sales (FK → sales. total_amount) – сумма продаж;
+
 – units_sold (FK → sales. quantity) – количество проданных единиц;
+
 – avg_unit_price (FK → sales.AVG(total_amount / quantity))  – средняя цена за единицу;
+
 – promo_share (FK → products.promo_flag)  – доля продаж по акции (в процентах).
+
 Таблица sales_summary – сводные показатели по продажам. Фиксирует ключевые метрики по всем продажам за период, независимо от конкретного товара. Атрибуты: 
+
 – period – период агрегации (например, 2025 10, 2025 Q3, 2025 W40); 
+
 – total_revenue (FK → sales.total_amount) – общая сумма продаж за период;
+
  – total_units_sold (FK → sales.quantity) – общее количество проданных единиц; 
-– average_check (FK → sales.AVG(total_amount)) – средний чек; 
+–
+average_check (FK → sales.AVG(total_amount)) – средний чек; 
+
 – top_category (FK → products.category) – категория с наибольшей выручкой; 
+
 Таблица category_metrics – показатели по товарным категориям. Агрегирует ключевые метрики по каждой категории товаров за период. Атрибуты: 
+
 – category (FK → category.id) – наименование категории; 
+
 – period – период агрегации (например, 2025 10, 2025 Q3, 2025 W40); 
+
 – units_sold (FK → sales.quantity) – общее количество проданных единиц в категории; 
+
 – total_sales (FK → sales.total_amount) – суммарная выручка по категории; 
+
 – avg_unit_price (FK → sales.AVG(total_amount / quantity)) – средняя цена за единицу;
+
 – promo_share (FK → products.promo_flag) – доля акционных продаж в категории (в процентах); 
+
 – top_product (FK → products.id) – самый продаваемый товар в категории (по выручке);
+
 Таблица check_dynamics – динамика среднего чека. Позволяет отслеживать, как меняется средний чек по дням, неделям или месяцам. Атрибуты: 
+
 – period – период агрегации (2025 10 08, 2025 W40, 2025 10);
+
 – average_check (FK → sales.AVG(total_amount)) – средний чек за период;
+
 – min_check (FK → sales.MIN(total_amount)) – минимальный чек;
+
 – max_check (FK → sales.MAX(total_amount)) – максимальный чек;
+
 – promo_check – средний чек по акционным товарам (WHERE pro-mo_flag = true); 
+
 – non_promo_check – средний чек по обычным товарам (WHERE pro-mo_flag = false).
+
 Таблица revenue_metrics – детализация выручки. Фиксирует структуру выручки по товарам и категориям за период, с возможностью анализа акций. Атрибуты: 
+
 – period – период агрегации (2025 10, 2025 Q3, 2025 W40);
+
 – product_id (FK → products.id) – товар;
+
 – category (FK → category.id) – категория товара;
+
 – total_revenue (FK → sales.total_amount) – суммарная выручка по товару;
+
 – promo_revenue – выручка от акционных продаж (WHERE promo_flag = true);
+
 – non_promo_revenue – выручка от обычных продаж (WHERE pro-mo_flag = false); 
+
 – revenue_share – доля товара в общей выручке за период (в процентах).
 
 <img width="926" height="572" alt="image" src="https://github.com/user-attachments/assets/d5628c3a-51b7-440d-8180-c9fb4ab93340" />
