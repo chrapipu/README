@@ -351,13 +351,174 @@ Backend сервер реализован на Java с использовани�
 
 ### Unit-тесты
 
-Представить код тестов для пяти методов и его пояснение
+Unit тесты проверяют работу минимальных изолированных частей программы – отдельных методов и классов. Их цель заключается в том, чтобы убедиться в корректности логики без зависимости от внешних сервисов или базы данных.
+Для написания unit тестов в Java проектах обычно используются библиотеки JUnit 5 и Mockito.
+Общее описание группы тестов:
+1	Проверка корректности загрузки Excel файла допустимого формата (.xlsx).
+2	Проверка реакции системы на некорректный формат файла (.txt, .csv).
+3	Проверка обработки пустого файла или файла без данных.
+4	Проверка корректности парсинга строк и столбцов (например, числовые значения, даты).
+5	Проверка генерации исключений при нарушении структуры файла.
+В качестве примера ниже представлен unit тест для сервиса загрузки Excel-файла.
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class ExcelUploadServiceTests {
+
+    private ExcelUploadService excelUploadService;
+
+    @BeforeEach
+    void setUp() {
+        excelUploadService = new ExcelUploadService();
+    }
+
+    // 1. Проверка корректной загрузки Excel файла допустимого формата (.xlsx)
+    @Test
+    void upload_ShouldParseValidExcelFile() {
+        InputStream file = getClass().getResourceAsStream("/test-data.xlsx");
+        List<RowData> result = excelUploadService.upload(file);
+
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+        assertEquals("Product A", result.get(0).getName());
+    }
+
+    // 2. Проверка реакции системы на некорректный формат файла (.txt)
+    @Test
+    void upload_ShouldThrowException_WhenFileFormatInvalid() {
+        InputStream invalidFile = new ByteArrayInputStream("not an excel".getBytes());
+
+        assertThrows(InvalidFormatException.class, () ->
+            excelUploadService.upload(invalidFile));
+    }
+
+    // 3. Проверка обработки пустого файла
+    @Test
+    void upload_ShouldThrowException_WhenFileIsEmpty() {
+        InputStream emptyFile = new ByteArrayInputStream(new byte[0]);
+
+        assertThrows(RuntimeException.class, () ->
+            excelUploadService.upload(emptyFile));
+    }
+
+    // 4. Проверка корректности парсинга числовых значений
+    @Test
+    void upload_ShouldParseNumericValuesCorrectly() {
+        InputStream file = getClass().getResourceAsStream("/numeric-data.xlsx");
+        List<RowData> result = excelUploadService.upload(file);
+
+        assertEquals(100, result.get(0).getQuantity());
+        assertEquals(59.99, result.get(0).getPrice());
+    }
+
+    // 5. Проверка генерации исключений при нарушении структуры файла
+    @Test
+    void upload_ShouldThrowException_WhenStructureInvalid() {
+        InputStream file = getClass().getResourceAsStream("/invalid-structure.xlsx");
+
+        assertThrows(IllegalStateException.class, () ->
+            excelUploadService.upload(file));
+    }
+}
+
 
 ### Интеграционные тесты
 
-Представить код тестов и его пояснение
+Интеграционные тесты проверяют взаимодействие функции загрузки Excel с другими модулями системы – контроллером, сервисом и базой данных. В Spring Boot для этого используется аннотация @SpringBootTest и библиотека MockMvc.
+Общее описание:
+1	Проверка загрузки Excel файла через REST контроллер (POST /api/upload/excel) Тесты подтверждают, что при отправке валидного Excel файла система корректно принимает его через API, инициирует обработку и возвращает положительный ответ.
+2	Проверка сохранения данных из Excel в базу данных (In Memory DB для тестов) После успешной загрузки файла тесты проверяют, что данные действительно сохраняются в тестовую базу данных и доступны для дальнейшего использования.
+3	Проверка корректности ответа API (HTTP статус, JSON ответ) Тесты оценивают, что система возвращает корректные коды состояния (200 OK, 400 Bad Request) и формирует структурированный JSON ответ с необходимыми полями (например, сообщение об успехе, количество строк).
+4	Проверка обработки ошибок при загрузке некорректного файла Тесты моделируют ситуации загрузки пустого или неподдерживаемого файла и подтверждают, что система корректно реагирует, возвращая сообщение об ошибке и соответствующий HTTP статус.
+5	Проверка информативности ответа API (количество обработанных строк) Дополнительно тесты проверяют, что система возвращает мета информацию о загруженных данных, например количество успешно обработанных строк, что повышает прозрачность работы сервиса.
+В качестве примера ниже приведен код тестов для контроллера авторизации.
 
----
+@SpringBootTest
+@AutoConfigureMockMvc
+class ExcelUploadIntegrationTests {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    // 1. Успешная загрузка Excel файла
+    @Test
+    void uploadExcel_ShouldReturnOkAndMessage() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "test-data.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            getClass().getResourceAsStream("/test-data.xlsx")
+        );
+
+        mockMvc.perform(multipart("/api/upload/excel").file(file))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.message").value("File uploaded successfully"));
+    }
+
+    // 2. Загрузка файла неверного формата (.txt)
+    @Test
+    void uploadExcel_ShouldReturnBadRequest_WhenFileInvalid() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "invalid.txt",
+            "text/plain",
+            "wrong content".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/upload/excel").file(file))
+               .andExpect(status().isBadRequest());
+    }
+
+    // 3. Загрузка пустого файла
+    @Test
+    void uploadExcel_ShouldReturnBadRequest_WhenFileEmpty() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "empty.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            new byte[0]
+        );
+
+        mockMvc.perform(multipart("/api/upload/excel").file(file))
+               .andExpect(status().isBadRequest());
+    }
+
+    // 4. Проверка сохранения данных в базу
+    @Test
+    void uploadExcel_ShouldSaveDataToDatabase() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "numeric-data.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            getClass().getResourceAsStream("/numeric-data.xlsx")
+        );
+
+        mockMvc.perform(multipart("/api/upload/excel").file(file))
+               .andExpect(status().isOk());
+
+        // Проверка через API, что данные сохранились
+        mockMvc.perform(get("/api/data"))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$[0].name").value("Product A"));
+    }
+
+    // 5. Проверка ответа API с количеством строк
+    @Test
+    void uploadExcel_ShouldReturnRowsCount() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+            "file", "test-data.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            getClass().getResourceAsStream("/test-data.xlsx")
+        );
+
+        mockMvc.perform(multipart("/api/upload/excel").file(file))
+               .andExpect(status().isOk())
+               .andExpect(jsonPath("$.rowsCount").value(5));
+    }
+}
+
 
 ## **Установка и  запуск**
 
